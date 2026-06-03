@@ -1,7 +1,6 @@
 :root {
   --bg: #070b18;
   --panel: rgba(17, 25, 46, 0.82);
-  --panel-strong: #10192e;
   --border: rgba(255, 255, 255, 0.1);
   --text: #edf4ff;
   --muted: #94a4bd;
@@ -327,7 +326,8 @@ label {
 .mini-card,
 .panel,
 .item-card,
-.leader-row {
+.leader-row,
+.folder-card {
   border: 1px solid var(--border);
   background: var(--panel);
   backdrop-filter: blur(18px);
@@ -470,6 +470,18 @@ label {
   border-color: rgba(255, 107, 138, 0.2);
 }
 
+.pending {
+  color: var(--warning);
+}
+
+.approved {
+  color: var(--success);
+}
+
+.rejected {
+  color: var(--danger);
+}
+
 .leader-row {
   display: grid;
   grid-template-columns: 54px 1fr auto;
@@ -536,6 +548,23 @@ label {
   color: var(--muted);
   text-align: center;
   padding: 22px;
+}
+
+.folder-card {
+  padding: 18px;
+  border-radius: 24px;
+}
+
+.folder-card summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.folder-content {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 @media (max-width: 900px) {

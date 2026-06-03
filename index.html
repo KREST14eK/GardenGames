@@ -15,6 +15,7 @@
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
   <link rel="stylesheet" href="./css/style.css">
 </head>
+
 <body>
   <div class="bg-orb bg-orb-one"></div>
   <div class="bg-orb bg-orb-two"></div>
@@ -26,14 +27,14 @@
           <div class="logo">Z</div>
           <div>
             <h1>Zenmonk</h1>
-            <p>Игровой банк виртуальной валюты</p>
+            <p>Игровая финансовая система</p>
           </div>
         </div>
 
         <div class="hero">
           <p class="overline">PRIVATE ZEN SYSTEM</p>
-          <h2>Баланс, задания, штрафы и награды</h2>
-          <p>Вход через логин и пароль. Email скрыт - Firebase использует технический адрес внутри кода.</p>
+          <h2>Задачи, баланс, награды и штрафы</h2>
+          <p>Вход выполняется по логину и паролю. Внутри Firebase используется технический email.</p>
         </div>
 
         <form class="auth-form" id="authForm">
@@ -78,7 +79,7 @@
 
       <nav class="tabs">
         <button class="tab active" data-view="dashboardView">Главная</button>
-        <button class="tab" data-view="tasksView">Задачи</button>
+        <button id="tasksTab" class="tab" data-view="tasksView">Задачи</button>
         <button class="tab" data-view="historyView">История</button>
         <button class="tab" data-view="leaderboardView">Рейтинг</button>
         <button id="adminTab" class="tab hidden" data-view="adminView">Админка</button>
@@ -103,36 +104,33 @@
           </article>
 
           <article class="mini-card">
-            <p>Заявки</p>
-            <h3 id="dashRequests">0</h3>
+            <p>Задачи</p>
+            <h3 id="dashTasks">0</h3>
           </article>
-        </div>
-
-        <div class="panel">
-          <h2>Установка как приложение</h2>
-          <p>На iPhone открой сайт через Safari, нажми «Поделиться» и выбери «На экран Домой». На Android открой сайт через Chrome и выбери «Добавить на главный экран».</p>
         </div>
       </section>
 
       <section id="tasksView" class="view">
         <div class="section-head">
           <div>
-            <p class="overline">TASK CENTER</p>
-            <h2>Задачи</h2>
+            <p class="overline">MY TASKS</p>
+            <h2>Мои задачи</h2>
           </div>
           <button id="reloadTasksBtn" class="secondary">Обновить</button>
         </div>
+
         <div id="tasksList" class="list"></div>
       </section>
 
       <section id="historyView" class="view">
         <div class="section-head">
           <div>
-            <p class="overline">TRANSACTIONS</p>
-            <h2>История операций</h2>
+            <p class="overline">HISTORY</p>
+            <h2>История</h2>
           </div>
           <button id="reloadHistoryBtn" class="secondary">Обновить</button>
         </div>
+
         <div id="historyList" class="list"></div>
       </section>
 
@@ -144,13 +142,14 @@
           </div>
           <button id="reloadLeaderboardBtn" class="secondary">Обновить</button>
         </div>
+
         <div id="leaderboardList" class="list"></div>
       </section>
 
       <section id="adminView" class="view">
         <div id="adminLocked" class="panel">
           <h2>Нет доступа</h2>
-          <p>Админка доступна только аккаунтам yash и fazzerTcity.</p>
+          <p>Админка доступна только администраторам.</p>
         </div>
 
         <div id="adminPanel" class="hidden">
@@ -186,11 +185,38 @@
 
               <label>
                 Причина
-                <input id="adminReason" type="text" placeholder="Например бонус за активность">
+                <input id="adminReason" type="text" placeholder="Например бонус или штраф">
               </label>
 
               <button id="applyOperationBtn">Применить</button>
               <p id="adminMessage" class="message"></p>
+            </div>
+
+            <div class="panel">
+              <h3>Создать задачу</h3>
+
+              <label>
+                Кому назначить
+                <select id="taskUserSelect"></select>
+              </label>
+
+              <label>
+                Название задачи
+                <input id="taskTitleInput" type="text" placeholder="Например помощь участнику">
+              </label>
+
+              <label>
+                Описание
+                <input id="taskDescriptionInput" type="text" placeholder="Что нужно сделать">
+              </label>
+
+              <label>
+                Награда в ZEN
+                <input id="taskRewardInput" type="number" min="0" placeholder="Например 50">
+              </label>
+
+              <button id="createTaskBtn">Создать задачу</button>
+              <p id="taskCreateMessage" class="message"></p>
             </div>
 
             <div class="panel">
@@ -199,8 +225,13 @@
             </div>
 
             <div class="panel wide">
-              <h3>Заявки на задачи</h3>
-              <div id="taskRequestsList" class="list"></div>
+              <h3>Заявки на проверку</h3>
+              <div id="reviewTasksList" class="list"></div>
+            </div>
+
+            <div class="panel wide">
+              <h3>Все задачи по пользователям</h3>
+              <div id="adminTasksByUsers" class="list"></div>
             </div>
           </div>
         </div>

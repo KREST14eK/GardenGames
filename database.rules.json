@@ -9,17 +9,19 @@
       }
     },
 
-    "transactions": {
-      "$id": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
-        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+    "tasks": {
+      "$taskId": {
+        ".read": "auth != null && (data.child('assignedTo').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || data.child('assignedTo').val() == auth.uid)"
       }
     },
 
-    "taskRequests": {
-      "$id": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
-        ".write": "auth != null && (newData.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+    "transactionsByUser": {
+      "$loginKey": {
+        "$transactionId": {
+          ".read": "auth != null && (root.child('users').child(auth.uid).child('loginKey').val() == $loginKey || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+        }
       }
     }
   }

@@ -26,55 +26,8 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 const CURRENCY_CODE = "ZEN";
-const CURRENCY_NAME = "Зениты";
-const INITIAL_BALANCE = 500;
-
+const INITIAL_BALANCE = 0;
 const ADMIN_LOGINS = ["yash", "fazzertcity"];
-
-const TASKS = [
-  {
-    id: "daily_check",
-    title: "Ежедневная отметка",
-    category: "Активность",
-    reward: 25,
-    description: "Зайти в систему и отметиться как активный участник."
-  },
-  {
-    id: "help_member",
-    title: "Помощь участнику",
-    category: "Сообщество",
-    reward: 75,
-    description: "Помочь другому участнику разобраться с задачей или правилом."
-  },
-  {
-    id: "event_play",
-    title: "Участие в событии",
-    category: "Ивент",
-    reward: 120,
-    description: "Принять участие в игровом событии и довести действие до результата."
-  },
-  {
-    id: "report",
-    title: "Короткий отчёт",
-    category: "Контент",
-    reward: 90,
-    description: "Описать событие, ситуацию или результат в короткой форме."
-  },
-  {
-    id: "discipline",
-    title: "Бонус за дисциплину",
-    category: "Репутация",
-    reward: 60,
-    description: "Получить отметку за соблюдение правил и нормальную коммуникацию."
-  },
-  {
-    id: "special",
-    title: "Спецзадание",
-    category: "Особое",
-    reward: 200,
-    description: "Выполнить индивидуальное поручение администратора."
-  }
-];
 
 const $ = (id) => document.getElementById(id);
 
@@ -142,13 +95,13 @@ function setMessage(id, text, type = "") {
 }
 
 function friendlyError(error) {
-  const code = error?.code || "";
+  const code = error?.code || error?.message || "";
 
-  if (code === "auth/invalid-credential") return "Неверный логин или пароль.";
-  if (code === "auth/email-already-in-use") return "Такой логин уже занят.";
-  if (code === "auth/weak-password") return "Пароль должен быть минимум 6 символов.";
-  if (code === "auth/unauthorized-domain") return "Домен сайта не добавлен в Firebase Authentication.";
-  if (code === "PERMISSION_DENIED") return "Firebase запретил операцию. Проверь правила Realtime Database.";
+  if (code.includes("auth/invalid-credential")) return "Неверный логин или пароль.";
+  if (code.includes("auth/email-already-in-use")) return "Такой логин уже занят.";
+  if (code.includes("auth/weak-password")) return "Пароль должен быть минимум 6 символов.";
+  if (code.includes("auth/unauthorized-domain")) return "Домен сайта не добавлен в Firebase Authentication.";
+  if (code.includes("PERMISSION_DENIED")) return "Firebase запретил операцию. Проверь правила Realtime Database.";
 
   return error?.message || "Ошибка.";
 }
@@ -170,9 +123,7 @@ async function register() {
 
   try {
     const { originalLogin, loginKey, password } = getAuthFields();
-    const email = makeEmail(loginKey);
-
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    const credential = await createUserWithEmailAndPassword(auth, makeEmail(loginKey), password);
 
     await updateProfile(credential.user, {
       displayName: originalLogin
@@ -263,10 +214,10 @@ function renderShell() {
   $("dashRole").textContent = roleName(currentProfile.role);
 
   $("adminTab").classList.toggle("hidden", !admin);
+  $("tasksTab").classList.toggle("hidden", admin);
 
-  if (!admin && activeView === "adminView") {
-    openView("dashboardView");
-  }
+  if (admin && activeView === "tasksView") openView("dashboardView");
+  if (!admin && activeView === "adminView") openView("dashboardView");
 }
 
 function openView(viewId) {
@@ -295,68 +246,91 @@ async function loadView() {
 }
 
 async function loadDashboard() {
-  const requestsSnapshot = await get(ref(db, "taskRequests"));
+  const snapshot = await get(ref(db, "tasks"));
   let count = 0;
 
-  if (requestsSnapshot.exists()) {
-    const requests = Object.values(requestsSnapshot.val());
-    count = requests.filter((item) => item.userId === currentUser.uid).length;
+  if (snapshot.exists()) {
+    const tasks = Object.values(snapshot.val());
+
+    if (currentProfile.role === "admin") {
+      count = tasks.length;
+    } else {
+      count = tasks.filter((task) => task.assignedTo === currentUser.uid).length;
+    }
   }
 
-  $("dashRequests").textContent = count;
+  $("dashTasks").textContent = count;
 }
 
 async function loadTasks() {
   const list = $("tasksList");
   list.innerHTML = `<div class="panel empty">Загрузка задач...</div>`;
 
-  const snapshot = await get(ref(db, "taskRequests"));
-  const pending = new Set();
+  const snapshot = await get(ref(db, "tasks"));
 
-  if (snapshot.exists()) {
-    Object.values(snapshot.val()).forEach((request) => {
-      if (request.userId === currentUser.uid && request.status === "pending") {
-        pending.add(request.taskId);
-      }
-    });
+  if (!snapshot.exists()) {
+    list.innerHTML = `<div class="panel empty">У тебя пока нет задач.</div>`;
+    return;
   }
 
-  list.innerHTML = TASKS.map((task) => {
-    const isPending = pending.has(task.id);
+  const tasks = Object.values(snapshot.val())
+    .filter((task) => task.assignedTo === currentUser.uid)
+    .sort((a, b) => b.createdAt - a.createdAt);
 
-    return `
-      <article class="item-card">
-        <div class="item-top">
-          <div>
-            <span class="pill">${escapeHtml(task.category)}</span>
-            <h3>${escapeHtml(task.title)}</h3>
-          </div>
-          <span class="pill reward">+${task.reward} ${CURRENCY_CODE}</span>
-        </div>
-        <p>${escapeHtml(task.description)}</p>
-        <button class="send-task-btn" data-task-id="${escapeHtml(task.id)}" ${isPending ? "disabled" : ""}>
-          ${isPending ? "На проверке" : "Отправить на проверку"}
-        </button>
-      </article>
-    `;
-  }).join("");
+  if (tasks.length === 0) {
+    list.innerHTML = `<div class="panel empty">У тебя пока нет задач.</div>`;
+    return;
+  }
+
+  list.innerHTML = tasks.map(renderUserTaskCard).join("");
 }
 
-async function sendTaskRequest(taskId) {
-  const task = TASKS.find((item) => item.id === taskId);
-  if (!task) return;
+function renderUserTaskCard(task) {
+  const canSubmit = task.status === "active";
+  const statusText = getTaskStatusText(task.status);
 
-  const requestRef = push(ref(db, "taskRequests"));
+  return `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <span class="pill ${escapeHtml(task.status)}">${escapeHtml(statusText)}</span>
+          <h3>${escapeHtml(task.title)}</h3>
+        </div>
+        <span class="pill reward">+${Number(task.reward || 0)} ${CURRENCY_CODE}</span>
+      </div>
 
-  await set(requestRef, {
-    id: requestRef.key,
-    userId: currentUser.uid,
-    username: currentProfile.username,
-    taskId: task.id,
-    taskTitle: task.title,
-    reward: task.reward,
-    status: "pending",
-    createdAt: now(),
+      <p>${escapeHtml(task.description || "Без описания")}</p>
+      <p>Создал: ${escapeHtml(task.createdByName || "admin")}</p>
+      <p>Дата: ${escapeHtml(formatDate(task.createdAt))}</p>
+
+      <button class="submit-task-btn" data-id="${escapeHtml(task.id)}" ${canSubmit ? "" : "disabled"}>
+        ${canSubmit ? "Отправить на проверку" : statusText}
+      </button>
+    </article>
+  `;
+}
+
+function getTaskStatusText(status) {
+  if (status === "active") return "Активна";
+  if (status === "review") return "На проверке";
+  if (status === "approved") return "Одобрена";
+  if (status === "rejected") return "Отклонена";
+  return "Неизвестно";
+}
+
+async function submitTask(taskId) {
+  const taskRef = ref(db, `tasks/${taskId}`);
+  const snapshot = await get(taskRef);
+
+  if (!snapshot.exists()) return;
+
+  const task = snapshot.val();
+
+  if (task.assignedTo !== currentUser.uid || task.status !== "active") return;
+
+  await update(taskRef, {
+    status: "review",
+    submittedAt: now(),
     updatedAt: now()
   });
 
@@ -368,44 +342,62 @@ async function loadHistory() {
   const list = $("historyList");
   list.innerHTML = `<div class="panel empty">Загрузка истории...</div>`;
 
-  const snapshot = await get(ref(db, "transactions"));
+  const snapshot = await get(ref(db, "transactionsByUser"));
 
   if (!snapshot.exists()) {
-    list.innerHTML = `<div class="panel empty">Операций пока нет.</div>`;
+    list.innerHTML = `<div class="panel empty">История пока пустая.</div>`;
     return;
   }
 
-  let transactions = Object.values(snapshot.val());
+  const allHistory = snapshot.val();
 
   if (currentProfile.role !== "admin") {
-    transactions = transactions.filter((item) => item.userId === currentUser.uid);
-  }
+    const userHistory = allHistory[currentProfile.loginKey] || {};
+    const rows = Object.values(userHistory).sort((a, b) => b.createdAt - a.createdAt);
 
-  transactions.sort((a, b) => b.createdAt - a.createdAt);
+    if (rows.length === 0) {
+      list.innerHTML = `<div class="panel empty">История пока пустая.</div>`;
+      return;
+    }
 
-  if (transactions.length === 0) {
-    list.innerHTML = `<div class="panel empty">Операций пока нет.</div>`;
+    list.innerHTML = rows.map(renderTransaction).join("");
     return;
   }
 
-  list.innerHTML = transactions.map((item) => {
-    const typeClass = item.type === "debit" ? "debit" : "credit";
-    const sign = item.type === "debit" ? "-" : "+";
+  const folders = Object.entries(allHistory).sort(([a], [b]) => a.localeCompare(b, "ru"));
+
+  list.innerHTML = folders.map(([loginKey, items]) => {
+    const rows = Object.values(items).sort((a, b) => b.createdAt - a.createdAt);
 
     return `
-      <article class="item-card">
-        <div class="item-top">
-          <div>
-            <h3>${escapeHtml(item.reason || "Операция")}</h3>
-            <p>${escapeHtml(formatDate(item.createdAt))}</p>
-          </div>
-          <span class="pill ${typeClass}">${sign}${money(item.amount)}</span>
+      <details class="folder-card" open>
+        <summary>${escapeHtml(loginKey)} - ${rows.length} операций</summary>
+        <div class="folder-content">
+          ${rows.map(renderTransaction).join("")}
         </div>
-        <p>Пользователь: ${escapeHtml(item.username || "unknown")}</p>
-        <p>Выполнил: ${escapeHtml(item.adminName || "system")}</p>
-      </article>
+      </details>
     `;
   }).join("");
+}
+
+function renderTransaction(item) {
+  const typeClass = item.type === "debit" ? "debit" : "credit";
+  const sign = item.type === "debit" ? "-" : "+";
+
+  return `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <h3>${escapeHtml(item.reason || "Операция")}</h3>
+          <p>${escapeHtml(formatDate(item.createdAt))}</p>
+        </div>
+        <span class="pill ${typeClass}">${sign}${money(item.amount)}</span>
+      </div>
+
+      <p>Пользователь: ${escapeHtml(item.username || "unknown")}</p>
+      <p>Выполнил: ${escapeHtml(item.adminName || "system")}</p>
+    </article>
+  `;
 }
 
 async function loadLeaderboard() {
@@ -436,38 +428,45 @@ async function loadLeaderboard() {
 }
 
 async function loadAdmin() {
-  const isAdmin = currentProfile.role === "admin";
+  const admin = currentProfile.role === "admin";
 
-  $("adminLocked").classList.toggle("hidden", isAdmin);
-  $("adminPanel").classList.toggle("hidden", !isAdmin);
+  $("adminLocked").classList.toggle("hidden", admin);
+  $("adminPanel").classList.toggle("hidden", !admin);
 
-  if (!isAdmin) return;
+  if (!admin) return;
 
   await loadAdminUsers();
-  await loadTaskRequests();
+  await loadReviewTasks();
+  await loadAdminTasksByUsers();
+}
+
+async function getUsers() {
+  const snapshot = await get(ref(db, "users"));
+
+  if (!snapshot.exists()) return [];
+
+  return Object.values(snapshot.val()).sort((a, b) => {
+    return String(a.username).localeCompare(String(b.username), "ru");
+  });
 }
 
 async function loadAdminUsers() {
-  const select = $("adminUserSelect");
+  const users = await getUsers();
+
+  const adminSelect = $("adminUserSelect");
+  const taskSelect = $("taskUserSelect");
   const list = $("adminUsersList");
 
-  select.innerHTML = "";
-  list.innerHTML = `<div class="empty">Загрузка...</div>`;
-
-  const snapshot = await get(ref(db, "users"));
-
-  if (!snapshot.exists()) {
-    list.innerHTML = `<div class="empty">Пользователей нет.</div>`;
-    return;
-  }
-
-  const users = Object.values(snapshot.val()).sort((a, b) => {
-    return String(a.username).localeCompare(String(b.username), "ru");
-  });
-
-  select.innerHTML = users.map((user) => {
+  adminSelect.innerHTML = users.map((user) => {
     return `<option value="${escapeHtml(user.uid)}">${escapeHtml(user.username)} - ${money(user.balance)}</option>`;
   }).join("");
+
+  taskSelect.innerHTML = users
+    .filter((user) => user.role !== "admin")
+    .map((user) => {
+      return `<option value="${escapeHtml(user.uid)}">${escapeHtml(user.username)}</option>`;
+    })
+    .join("");
 
   list.innerHTML = users.map((user) => {
     return `
@@ -512,21 +511,7 @@ async function applyAdminOperation() {
       updatedAt: now()
     });
 
-    const transactionRef = push(ref(db, "transactions"));
-
-    await set(transactionRef, {
-      id: transactionRef.key,
-      userId: user.uid,
-      username: user.username,
-      type: operation,
-      amount,
-      delta,
-      reason,
-      adminId: currentUser.uid,
-      adminName: currentProfile.username,
-      balanceAfter: newBalance,
-      createdAt: now()
-    });
+    await createTransaction(user, operation, amount, delta, reason, newBalance);
 
     $("adminAmount").value = "";
     $("adminReason").value = "";
@@ -540,63 +525,133 @@ async function applyAdminOperation() {
   }
 }
 
-async function loadTaskRequests() {
-  const list = $("taskRequestsList");
+async function createTransaction(user, type, amount, delta, reason, balanceAfter) {
+  const transactionRef = push(ref(db, `transactionsByUser/${user.loginKey}`));
+
+  await set(transactionRef, {
+    id: transactionRef.key,
+    userId: user.uid,
+    username: user.username,
+    loginKey: user.loginKey,
+    type,
+    amount,
+    delta,
+    reason,
+    adminId: currentUser.uid,
+    adminName: currentProfile.username,
+    balanceAfter,
+    createdAt: now()
+  });
+}
+
+async function createTask() {
+  setMessage("taskCreateMessage", "Создаю задачу...");
+
+  try {
+    const assignedTo = $("taskUserSelect").value;
+    const title = $("taskTitleInput").value.trim();
+    const description = $("taskDescriptionInput").value.trim();
+    const reward = Number($("taskRewardInput").value);
+
+    if (!assignedTo) throw new Error("Выберите пользователя.");
+    if (!title) throw new Error("Введите название задачи.");
+    if (!description) throw new Error("Введите описание задачи.");
+    if (!Number.isFinite(reward) || reward < 0) throw new Error("Введите корректную награду.");
+
+    const userSnapshot = await get(ref(db, `users/${assignedTo}`));
+
+    if (!userSnapshot.exists()) throw new Error("Пользователь не найден.");
+
+    const targetUser = userSnapshot.val();
+    const taskRef = push(ref(db, "tasks"));
+
+    await set(taskRef, {
+      id: taskRef.key,
+      title,
+      description,
+      reward,
+      status: "active",
+      assignedTo: targetUser.uid,
+      assignedToName: targetUser.username,
+      assignedToLoginKey: targetUser.loginKey,
+      createdBy: currentUser.uid,
+      createdByName: currentProfile.username,
+      createdAt: now(),
+      updatedAt: now()
+    });
+
+    $("taskTitleInput").value = "";
+    $("taskDescriptionInput").value = "";
+    $("taskRewardInput").value = "";
+
+    setMessage("taskCreateMessage", "Задача создана.", "success");
+
+    await loadAdmin();
+  } catch (error) {
+    setMessage("taskCreateMessage", friendlyError(error), "error");
+  }
+}
+
+async function loadReviewTasks() {
+  const list = $("reviewTasksList");
   list.innerHTML = `<div class="empty">Загрузка заявок...</div>`;
 
-  const snapshot = await get(ref(db, "taskRequests"));
+  const snapshot = await get(ref(db, "tasks"));
 
   if (!snapshot.exists()) {
     list.innerHTML = `<div class="empty">Заявок нет.</div>`;
     return;
   }
 
-  const requests = Object.values(snapshot.val())
-    .filter((item) => item.status === "pending")
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const tasks = Object.values(snapshot.val())
+    .filter((task) => task.status === "review")
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 
-  if (requests.length === 0) {
-    list.innerHTML = `<div class="empty">Новых заявок нет.</div>`;
+  if (tasks.length === 0) {
+    list.innerHTML = `<div class="empty">Заявок на проверку нет.</div>`;
     return;
   }
 
-  list.innerHTML = requests.map((request) => {
+  list.innerHTML = tasks.map((task) => {
     return `
       <article class="item-card">
         <div class="item-top">
           <div>
-            <span class="pill">${escapeHtml(request.username)}</span>
-            <h3>${escapeHtml(request.taskTitle)}</h3>
+            <span class="pill pending">${escapeHtml(task.assignedToName)}</span>
+            <h3>${escapeHtml(task.title)}</h3>
           </div>
-          <span class="pill reward">+${request.reward} ${CURRENCY_CODE}</span>
+          <span class="pill reward">+${Number(task.reward || 0)} ${CURRENCY_CODE}</span>
         </div>
-        <p>Дата заявки: ${escapeHtml(formatDate(request.createdAt))}</p>
+
+        <p>${escapeHtml(task.description || "Без описания")}</p>
+        <p>Отправлено: ${escapeHtml(formatDate(task.submittedAt))}</p>
+
         <div class="actions">
-          <button data-action="approve" data-id="${escapeHtml(request.id)}">Одобрить</button>
-          <button class="danger" data-action="reject" data-id="${escapeHtml(request.id)}">Отклонить</button>
+          <button data-action="approve-task" data-id="${escapeHtml(task.id)}">Одобрить</button>
+          <button class="danger" data-action="reject-task" data-id="${escapeHtml(task.id)}">Отклонить</button>
         </div>
       </article>
     `;
   }).join("");
 }
 
-async function approveRequest(requestId) {
-  const requestRef = ref(db, `taskRequests/${requestId}`);
-  const requestSnapshot = await get(requestRef);
+async function approveTask(taskId) {
+  const taskRef = ref(db, `tasks/${taskId}`);
+  const taskSnapshot = await get(taskRef);
 
-  if (!requestSnapshot.exists()) return;
+  if (!taskSnapshot.exists()) return;
 
-  const request = requestSnapshot.val();
+  const task = taskSnapshot.val();
 
-  if (request.status !== "pending") return;
+  if (task.status !== "review") return;
 
-  const userRef = ref(db, `users/${request.userId}`);
+  const userRef = ref(db, `users/${task.assignedTo}`);
   const userSnapshot = await get(userRef);
 
   if (!userSnapshot.exists()) return;
 
   const user = userSnapshot.val();
-  const reward = Number(request.reward || 0);
+  const reward = Number(task.reward || 0);
   const newBalance = Number(user.balance || 0) + reward;
 
   await update(userRef, {
@@ -604,7 +659,7 @@ async function approveRequest(requestId) {
     updatedAt: now()
   });
 
-  await update(requestRef, {
+  await update(taskRef, {
     status: "approved",
     reviewedBy: currentUser.uid,
     reviewedByName: currentProfile.username,
@@ -612,28 +667,21 @@ async function approveRequest(requestId) {
     updatedAt: now()
   });
 
-  const transactionRef = push(ref(db, "transactions"));
-
-  await set(transactionRef, {
-    id: transactionRef.key,
-    userId: user.uid,
-    username: user.username,
-    type: "credit",
-    amount: reward,
-    delta: reward,
-    reason: `Задача: ${request.taskTitle}`,
-    adminId: currentUser.uid,
-    adminName: currentProfile.username,
-    balanceAfter: newBalance,
-    createdAt: now()
-  });
+  await createTransaction(
+    user,
+    "credit",
+    reward,
+    reward,
+    `Задача: ${task.title}`,
+    newBalance
+  );
 
   await loadAdmin();
   await loadLeaderboard();
 }
 
-async function rejectRequest(requestId) {
-  await update(ref(db, `taskRequests/${requestId}`), {
+async function rejectTask(taskId) {
+  await update(ref(db, `tasks/${taskId}`), {
     status: "rejected",
     reviewedBy: currentUser.uid,
     reviewedByName: currentProfile.username,
@@ -642,6 +690,56 @@ async function rejectRequest(requestId) {
   });
 
   await loadAdmin();
+}
+
+async function loadAdminTasksByUsers() {
+  const list = $("adminTasksByUsers");
+  list.innerHTML = `<div class="empty">Загрузка задач...</div>`;
+
+  const snapshot = await get(ref(db, "tasks"));
+
+  if (!snapshot.exists()) {
+    list.innerHTML = `<div class="empty">Задач пока нет.</div>`;
+    return;
+  }
+
+  const tasks = Object.values(snapshot.val()).sort((a, b) => b.createdAt - a.createdAt);
+  const groups = {};
+
+  tasks.forEach((task) => {
+    const key = task.assignedToLoginKey || "unknown";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(task);
+  });
+
+  list.innerHTML = Object.entries(groups).map(([loginKey, items]) => {
+    return `
+      <details class="folder-card" open>
+        <summary>${escapeHtml(loginKey)} - ${items.length} задач</summary>
+        <div class="folder-content">
+          ${items.map(renderAdminTaskCard).join("")}
+        </div>
+      </details>
+    `;
+  }).join("");
+}
+
+function renderAdminTaskCard(task) {
+  return `
+    <article class="item-card">
+      <div class="item-top">
+        <div>
+          <span class="pill ${escapeHtml(task.status)}">${escapeHtml(getTaskStatusText(task.status))}</span>
+          <h3>${escapeHtml(task.title)}</h3>
+        </div>
+        <span class="pill reward">+${Number(task.reward || 0)} ${CURRENCY_CODE}</span>
+      </div>
+
+      <p>${escapeHtml(task.description || "Без описания")}</p>
+      <p>Пользователь: ${escapeHtml(task.assignedToName || "unknown")}</p>
+      <p>Создано: ${escapeHtml(formatDate(task.createdAt))}</p>
+    </article>
+  `;
 }
 
 function bindEvents() {
@@ -655,33 +753,33 @@ function bindEvents() {
   });
 
   document.querySelectorAll(".tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      openView(button.dataset.view);
-    });
+    button.addEventListener("click", () => openView(button.dataset.view));
   });
 
   $("reloadTasksBtn").addEventListener("click", loadTasks);
   $("reloadHistoryBtn").addEventListener("click", loadHistory);
   $("reloadLeaderboardBtn").addEventListener("click", loadLeaderboard);
   $("reloadAdminBtn").addEventListener("click", loadAdmin);
+
   $("applyOperationBtn").addEventListener("click", applyAdminOperation);
+  $("createTaskBtn").addEventListener("click", createTask);
 
   $("tasksList").addEventListener("click", (event) => {
-    const button = event.target.closest(".send-task-btn");
+    const button = event.target.closest(".submit-task-btn");
     if (!button) return;
 
-    sendTaskRequest(button.dataset.taskId);
+    submitTask(button.dataset.id);
   });
 
-  $("taskRequestsList").addEventListener("click", (event) => {
+  $("reviewTasksList").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
 
     const action = button.dataset.action;
     const id = button.dataset.id;
 
-    if (action === "approve") approveRequest(id);
-    if (action === "reject") rejectRequest(id);
+    if (action === "approve-task") approveTask(id);
+    if (action === "reject-task") rejectTask(id);
   });
 }
 

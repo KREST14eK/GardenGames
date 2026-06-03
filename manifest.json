@@ -1,7 +1,7 @@
 {
   "name": "Zenmonk",
   "short_name": "Zenmonk",
-  "description": "Игровой банк виртуальной валюты ZEN",
+  "description": "Игровая система задач и виртуального баланса ZEN",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
