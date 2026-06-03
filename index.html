@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Zenmonk</title>
+
+  <meta name="theme-color" content="#070b18">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Zenmonk">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-one"></div>
+  <div class="bg-orb bg-orb-two"></div>
+
+  <main class="app">
+    <section id="authScreen" class="auth-screen">
+      <div class="auth-card">
+        <div class="logo-row">
+          <div class="logo">Z</div>
+          <div>
+            <h1>Zenmonk</h1>
+            <p>Игровой банк виртуальной валюты</p>
+          </div>
+        </div>
+
+        <div class="hero">
+          <p class="overline">PRIVATE ZEN SYSTEM</p>
+          <h2>Баланс, задания, штрафы и награды</h2>
+          <p>Вход через логин и пароль. Email скрыт - Firebase использует технический адрес внутри кода.</p>
+        </div>
+
+        <form class="auth-form" id="authForm">
+          <label>
+            Логин
+            <input id="loginInput" type="text" placeholder="Например yash" autocomplete="username">
+          </label>
+
+          <label>
+            Пароль
+            <input id="passwordInput" type="password" placeholder="Минимум 6 символов" autocomplete="current-password">
+          </label>
+
+          <div class="auth-buttons">
+            <button id="loginBtn" type="button">Войти</button>
+            <button id="registerBtn" type="button" class="secondary">Создать аккаунт</button>
+          </div>
+
+          <p id="authMessage" class="message"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="appScreen" class="hidden">
+      <header class="topbar">
+        <div class="brand">
+          <div class="small-logo">Z</div>
+          <div>
+            <h1>Zenmonk</h1>
+            <p id="roleText">Пользователь</p>
+          </div>
+        </div>
+
+        <div class="user-panel">
+          <div>
+            <strong id="usernameText">...</strong>
+            <span id="uidText">...</span>
+          </div>
+          <button id="logoutBtn" class="ghost">Выйти</button>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-view="dashboardView">Главная</button>
+        <button class="tab" data-view="tasksView">Задачи</button>
+        <button class="tab" data-view="historyView">История</button>
+        <button class="tab" data-view="leaderboardView">Рейтинг</button>
+        <button id="adminTab" class="tab hidden" data-view="adminView">Админка</button>
+      </nav>
+
+      <section id="dashboardView" class="view active">
+        <div class="grid">
+          <article class="balance-card">
+            <p>Текущий баланс</p>
+            <h2 id="balanceText">0 ZEN</h2>
+            <span>Зениты</span>
+          </article>
+
+          <article class="mini-card">
+            <p>Логин</p>
+            <h3 id="dashLogin">...</h3>
+          </article>
+
+          <article class="mini-card">
+            <p>Роль</p>
+            <h3 id="dashRole">...</h3>
+          </article>
+
+          <article class="mini-card">
+            <p>Заявки</p>
+            <h3 id="dashRequests">0</h3>
+          </article>
+        </div>
+
+        <div class="panel">
+          <h2>Установка как приложение</h2>
+          <p>На iPhone открой сайт через Safari, нажми «Поделиться» и выбери «На экран Домой». На Android открой сайт через Chrome и выбери «Добавить на главный экран».</p>
+        </div>
+      </section>
+
+      <section id="tasksView" class="view">
+        <div class="section-head">
+          <div>
+            <p class="overline">TASK CENTER</p>
+            <h2>Задачи</h2>
+          </div>
+          <button id="reloadTasksBtn" class="secondary">Обновить</button>
+        </div>
+        <div id="tasksList" class="list"></div>
+      </section>
+
+      <section id="historyView" class="view">
+        <div class="section-head">
+          <div>
+            <p class="overline">TRANSACTIONS</p>
+            <h2>История операций</h2>
+          </div>
+          <button id="reloadHistoryBtn" class="secondary">Обновить</button>
+        </div>
+        <div id="historyList" class="list"></div>
+      </section>
+
+      <section id="leaderboardView" class="view">
+        <div class="section-head">
+          <div>
+            <p class="overline">ZEN RATING</p>
+            <h2>Рейтинг</h2>
+          </div>
+          <button id="reloadLeaderboardBtn" class="secondary">Обновить</button>
+        </div>
+        <div id="leaderboardList" class="list"></div>
+      </section>
+
+      <section id="adminView" class="view">
+        <div id="adminLocked" class="panel">
+          <h2>Нет доступа</h2>
+          <p>Админка доступна только аккаунтам yash и fazzerTcity.</p>
+        </div>
+
+        <div id="adminPanel" class="hidden">
+          <div class="section-head">
+            <div>
+              <p class="overline">ADMIN CONTROL</p>
+              <h2>Админка</h2>
+            </div>
+            <button id="reloadAdminBtn" class="secondary">Обновить</button>
+          </div>
+
+          <div class="admin-grid">
+            <div class="panel">
+              <h3>Операция с балансом</h3>
+
+              <label>
+                Пользователь
+                <select id="adminUserSelect"></select>
+              </label>
+
+              <label>
+                Тип операции
+                <select id="adminOperation">
+                  <option value="credit">Начислить</option>
+                  <option value="debit">Списать</option>
+                </select>
+              </label>
+
+              <label>
+                Сумма
+                <input id="adminAmount" type="number" min="1" placeholder="Например 100">
+              </label>
+
+              <label>
+                Причина
+                <input id="adminReason" type="text" placeholder="Например бонус за активность">
+              </label>
+
+              <button id="applyOperationBtn">Применить</button>
+              <p id="adminMessage" class="message"></p>
+            </div>
+
+            <div class="panel">
+              <h3>Пользователи</h3>
+              <div id="adminUsersList" class="mini-list"></div>
+            </div>
+
+            <div class="panel wide">
+              <h3>Заявки на задачи</h3>
+              <div id="taskRequestsList" class="list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
